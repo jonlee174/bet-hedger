@@ -172,8 +172,8 @@ export default function App() {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.header}>
-          <Text style={styles.title}>🎯 Bet Hedger</Text>
-          <Text style={styles.subtitle}>Calculate your perfect hedge</Text>
+          <Text style={styles.title}>BET HEDGER</Text>
+          <Text style={styles.subtitle}>Calculate your hedge</Text>
         </View>
 
         <View style={styles.modeToggle}>
@@ -182,7 +182,7 @@ export default function App() {
             onPress={() => { setMode('calculator'); setResult(null); setManualResult(null); }}
           >
             <Text style={[styles.modeButtonText, mode === 'calculator' && styles.modeButtonTextActive]}>
-              Calculate Hedge
+              CALCULATE
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -190,20 +190,20 @@ export default function App() {
             onPress={() => { setMode('manual'); setResult(null); setManualResult(null); }}
           >
             <Text style={[styles.modeButtonText, mode === 'manual' && styles.modeButtonTextActive]}>
-              Enter Both Bets
+              MANUAL
             </Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Original Bet</Text>
+          <Text style={styles.sectionTitle}>ORIGINAL BET</Text>
           
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Stake Amount ($)</Text>
+            <Text style={styles.label}>STAKE ($)</Text>
             <TextInput
               style={styles.input}
               placeholder="100"
-              placeholderTextColor="#666"
+              placeholderTextColor="#555"
               keyboardType="decimal-pad"
               value={originalStake}
               onChangeText={setOriginalStake}
@@ -211,11 +211,11 @@ export default function App() {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Odds (American)</Text>
+            <Text style={styles.label}>ODDS (AMERICAN)</Text>
             <TextInput
               style={styles.input}
               placeholder="+150 or -110"
-              placeholderTextColor="#666"
+              placeholderTextColor="#555"
               keyboardType="numbers-and-punctuation"
               value={originalOdds}
               onChangeText={setOriginalOdds}
@@ -224,30 +224,30 @@ export default function App() {
 
           <View style={styles.freeBetContainer}>
             <View style={styles.freeBetTextContainer}>
-              <Text style={styles.freeBetLabel}>Free Bet / Bonus Money</Text>
+              <Text style={styles.freeBetLabel}>FREE BET</Text>
               <Text style={styles.freeBetDescription}>
-                Toggle if original stake is free money
+                Original stake is bonus money
               </Text>
             </View>
             <Switch
               value={isFreeBet}
               onValueChange={setIsFreeBet}
-              trackColor={{ false: '#3a3a4a', true: '#4CAF50' }}
-              thumbColor={isFreeBet ? '#fff' : '#888'}
-              ios_backgroundColor="#3a3a4a"
+              trackColor={{ false: '#333', true: '#2E7D32' }}
+              thumbColor={isFreeBet ? '#4CAF50' : '#666'}
+              ios_backgroundColor="#333"
             />
           </View>
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Hedge Bet</Text>
+          <Text style={styles.sectionTitle}>HEDGE BET</Text>
           
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Hedge Odds (American)</Text>
+            <Text style={styles.label}>HEDGE ODDS (AMERICAN)</Text>
             <TextInput
               style={styles.input}
               placeholder="-120 or +100"
-              placeholderTextColor="#666"
+              placeholderTextColor="#555"
               keyboardType="numbers-and-punctuation"
               value={hedgeOdds}
               onChangeText={setHedgeOdds}
@@ -256,11 +256,11 @@ export default function App() {
 
           {mode === 'manual' && (
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Hedge Stake ($)</Text>
+              <Text style={styles.label}>HEDGE STAKE ($)</Text>
               <TextInput
                 style={styles.input}
                 placeholder="50"
-                placeholderTextColor="#666"
+                placeholderTextColor="#555"
                 keyboardType="decimal-pad"
                 value={hedgeStake}
                 onChangeText={setHedgeStake}
@@ -273,35 +273,35 @@ export default function App() {
           <TouchableOpacity 
             style={styles.calculateButton}
             onPress={handleCalculate}
-            activeOpacity={0.8}
+            activeOpacity={0.7}
           >
             <Text style={styles.calculateButtonText}>
-              {mode === 'calculator' ? 'Calculate Hedge' : 'Calculate Profit'}
+              {mode === 'calculator' ? 'CALCULATE' : 'CALCULATE'}
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity 
             style={styles.clearButton}
             onPress={handleClear}
-            activeOpacity={0.8}
+            activeOpacity={0.7}
           >
-            <Text style={styles.clearButtonText}>Clear</Text>
+            <Text style={styles.clearButtonText}>CLEAR</Text>
           </TouchableOpacity>
         </View>
 
         {result && mode === 'calculator' && (
           <View style={styles.resultCard}>
-            <Text style={styles.resultTitle}>📊 Results</Text>
+            <Text style={styles.resultTitle}>RESULTS</Text>
             
             <View style={styles.resultRow}>
-              <Text style={styles.resultLabel}>Hedge Amount:</Text>
-              <Text style={styles.resultValue}>${result.hedgeAmount}</Text>
+              <Text style={styles.resultLabel}>Hedge Amount</Text>
+              <Text style={styles.resultValueGold}>${result.hedgeAmount}</Text>
             </View>
 
             <View style={styles.divider} />
             
             <View style={styles.resultRow}>
-              <Text style={styles.resultLabel}>If Original Wins:</Text>
+              <Text style={styles.resultLabel}>If Original Wins</Text>
               <Text style={[
                 styles.resultValue,
                 parseFloat(result.profitIfOriginalWins) >= 0 ? styles.profit : styles.loss
@@ -311,7 +311,7 @@ export default function App() {
             </View>
             
             <View style={styles.resultRow}>
-              <Text style={styles.resultLabel}>If Hedge Wins:</Text>
+              <Text style={styles.resultLabel}>If Hedge Wins</Text>
               <Text style={[
                 styles.resultValue,
                 parseFloat(result.profitIfHedgeWins) >= 0 ? styles.profit : styles.loss
@@ -323,7 +323,7 @@ export default function App() {
             <View style={styles.divider} />
 
             <View style={styles.guaranteedContainer}>
-              <Text style={styles.guaranteedLabel}>Guaranteed Profit:</Text>
+              <Text style={styles.guaranteedLabel}>GUARANTEED PROFIT</Text>
               <Text style={[
                 styles.guaranteedValue,
                 parseFloat(result.guaranteedProfit) >= 0 ? styles.profit : styles.loss
@@ -336,24 +336,24 @@ export default function App() {
 
         {manualResult && mode === 'manual' && (
           <View style={styles.resultCard}>
-            <Text style={styles.resultTitle}>📊 Results</Text>
+            <Text style={styles.resultTitle}>RESULTS</Text>
             
             <View style={styles.resultRow}>
-              <Text style={styles.resultLabel}>Total Staked:</Text>
-              <Text style={styles.resultValue}>${manualResult.totalStaked}</Text>
+              <Text style={styles.resultLabel}>Total Staked</Text>
+              <Text style={styles.resultValueGold}>${manualResult.totalStaked}</Text>
             </View>
 
             <View style={styles.divider} />
 
-            <Text style={styles.scenarioTitle}>If Original Bet Wins (+{originalOdds})</Text>
+            <Text style={styles.scenarioTitle}>IF ORIGINAL WINS ({originalOdds})</Text>
             
             <View style={styles.resultRow}>
-              <Text style={styles.resultLabel}>You Receive:</Text>
-              <Text style={[styles.resultValue, styles.profit]}>${manualResult.originalPayout}</Text>
+              <Text style={styles.resultLabel}>You Receive</Text>
+              <Text style={styles.resultValue}>${manualResult.originalPayout}</Text>
             </View>
             
             <View style={styles.resultRow}>
-              <Text style={styles.resultLabel}>Net Profit:</Text>
+              <Text style={styles.resultLabel}>Net Profit</Text>
               <Text style={[
                 styles.resultValue,
                 parseFloat(manualResult.profitIfOriginalWins) >= 0 ? styles.profit : styles.loss
@@ -364,15 +364,15 @@ export default function App() {
 
             <View style={styles.divider} />
 
-            <Text style={styles.scenarioTitle}>If Hedge Bet Wins ({hedgeOdds})</Text>
+            <Text style={styles.scenarioTitle}>IF HEDGE WINS ({hedgeOdds})</Text>
             
             <View style={styles.resultRow}>
-              <Text style={styles.resultLabel}>You Receive:</Text>
-              <Text style={[styles.resultValue, styles.profit]}>${manualResult.hedgePayout}</Text>
+              <Text style={styles.resultLabel}>You Receive</Text>
+              <Text style={styles.resultValue}>${manualResult.hedgePayout}</Text>
             </View>
             
             <View style={styles.resultRow}>
-              <Text style={styles.resultLabel}>Net Profit:</Text>
+              <Text style={styles.resultLabel}>Net Profit</Text>
               <Text style={[
                 styles.resultValue,
                 parseFloat(manualResult.profitIfHedgeWins) >= 0 ? styles.profit : styles.loss
@@ -384,12 +384,19 @@ export default function App() {
             <View style={styles.divider} />
 
             <View style={styles.summaryContainer}>
-              <Text style={styles.summaryText}>
-                {parseFloat(manualResult.profitIfOriginalWins) >= 0 && parseFloat(manualResult.profitIfHedgeWins) >= 0
-                  ? '✅ Guaranteed profit either way!'
+              <Text style={[
+                styles.summaryText,
+                parseFloat(manualResult.profitIfOriginalWins) >= 0 && parseFloat(manualResult.profitIfHedgeWins) >= 0
+                  ? styles.profit
                   : parseFloat(manualResult.profitIfOriginalWins) < 0 && parseFloat(manualResult.profitIfHedgeWins) < 0
-                    ? '❌ Loss either way - adjust your bets'
-                    : '⚠️ Profit depends on outcome'}
+                    ? styles.loss
+                    : styles.warning
+              ]}>
+                {parseFloat(manualResult.profitIfOriginalWins) >= 0 && parseFloat(manualResult.profitIfHedgeWins) >= 0
+                  ? 'GUARANTEED PROFIT'
+                  : parseFloat(manualResult.profitIfOriginalWins) < 0 && parseFloat(manualResult.profitIfHedgeWins) < 0
+                    ? 'LOSS EITHER WAY'
+                    : 'OUTCOME DEPENDENT'}
               </Text>
             </View>
           </View>
@@ -398,17 +405,17 @@ export default function App() {
         {result === null && manualResult === null && originalStake !== '' && (
           <View style={styles.errorCard}>
             <Text style={styles.errorText}>
-              Please enter valid values for all fields
+              Enter valid values for all fields
             </Text>
           </View>
         )}
 
         <View style={styles.infoCard}>
-          <Text style={styles.infoTitle}>💡 How it works</Text>
+          <Text style={styles.infoTitle}>HOW IT WORKS</Text>
           <Text style={styles.infoText}>
             {mode === 'calculator' 
-              ? '• Enter your original bet stake and American odds\n• Enter the opposing side\'s odds for hedging\n• Toggle "Free Bet" if using bonus/promo money\n• Get the optimal hedge amount for guaranteed profit'
-              : '• Enter both your original bet and hedge bet details\n• See your profit/loss for each outcome\n• Toggle "Free Bet" if original stake is bonus money\n• Adjust amounts to find your ideal balance'}
+              ? 'Enter your original bet stake and American odds, then enter the opposing side\'s odds. Toggle Free Bet if using bonus money.'
+              : 'Enter both bets to see profit/loss for each outcome. Toggle Free Bet if original stake is bonus money.'}
           </Text>
         </View>
       </ScrollView>
@@ -419,238 +426,275 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: '#000',
   },
   scrollContent: {
-    padding: 20,
-    paddingTop: 60,
-    paddingBottom: 40,
+    padding: 16,
+    paddingTop: 56,
+    paddingBottom: 32,
   },
   header: {
     marginBottom: 24,
     alignItems: 'center',
   },
   title: {
-    fontSize: 32,
-    fontWeight: 'bold',
+    fontSize: 28,
+    fontWeight: '700',
     color: '#fff',
+    letterSpacing: 4,
     marginBottom: 4,
   },
   subtitle: {
-    fontSize: 16,
-    color: '#888',
+    fontSize: 13,
+    color: '#666',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
   },
   modeToggle: {
     flexDirection: 'row',
-    backgroundColor: '#252540',
-    borderRadius: 12,
-    padding: 4,
-    marginBottom: 16,
+    backgroundColor: '#111',
+    borderRadius: 4,
+    padding: 2,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#222',
   },
   modeButton: {
     flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 3,
     alignItems: 'center',
   },
   modeButtonActive: {
     backgroundColor: '#4CAF50',
   },
   modeButtonText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
-    color: '#888',
+    color: '#555',
+    letterSpacing: 1,
   },
   modeButtonTextActive: {
-    color: '#fff',
+    color: '#000',
   },
   card: {
-    backgroundColor: '#252540',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
+    backgroundColor: '#0a0a0a',
+    borderRadius: 4,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#1a1a1a',
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 11,
     fontWeight: '600',
-    color: '#fff',
+    color: '#888',
     marginBottom: 16,
+    letterSpacing: 2,
   },
   inputGroup: {
-    marginBottom: 16,
+    marginBottom: 14,
   },
   label: {
-    fontSize: 14,
-    color: '#aaa',
-    marginBottom: 8,
+    fontSize: 10,
+    color: '#666',
+    marginBottom: 6,
+    letterSpacing: 1,
   },
   input: {
-    backgroundColor: '#1a1a2e',
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 18,
+    backgroundColor: '#000',
+    borderRadius: 3,
+    padding: 14,
+    fontSize: 16,
     color: '#fff',
     borderWidth: 1,
-    borderColor: '#3a3a4a',
+    borderColor: '#333',
+    fontWeight: '500',
   },
   freeBetContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#1a1a2e',
-    borderRadius: 12,
-    padding: 16,
-    marginTop: 8,
+    backgroundColor: '#000',
+    borderRadius: 3,
+    padding: 14,
+    marginTop: 4,
+    borderWidth: 1,
+    borderColor: '#333',
   },
   freeBetTextContainer: {
     flex: 1,
     marginRight: 16,
   },
   freeBetLabel: {
-    fontSize: 16,
+    fontSize: 12,
     color: '#fff',
-    fontWeight: '500',
+    fontWeight: '600',
+    letterSpacing: 1,
   },
   freeBetDescription: {
-    fontSize: 12,
-    color: '#888',
-    marginTop: 4,
+    fontSize: 11,
+    color: '#555',
+    marginTop: 2,
   },
   buttonContainer: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 8,
     marginBottom: 16,
   },
   calculateButton: {
     flex: 2,
     backgroundColor: '#4CAF50',
-    borderRadius: 12,
-    padding: 18,
+    borderRadius: 3,
+    padding: 16,
     alignItems: 'center',
   },
   calculateButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
+    color: '#000',
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 2,
   },
   clearButton: {
     flex: 1,
-    backgroundColor: '#3a3a4a',
-    borderRadius: 12,
-    padding: 18,
+    backgroundColor: '#111',
+    borderRadius: 3,
+    padding: 16,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#333',
   },
   clearButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '500',
+    color: '#888',
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 1,
   },
   resultCard: {
-    backgroundColor: '#252540',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    borderWidth: 2,
+    backgroundColor: '#0a0a0a',
+    borderRadius: 4,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
     borderColor: '#4CAF50',
   },
   resultTitle: {
-    fontSize: 20,
+    fontSize: 11,
     fontWeight: '600',
-    color: '#fff',
+    color: '#4CAF50',
     marginBottom: 16,
     textAlign: 'center',
+    letterSpacing: 3,
   },
   resultRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: 6,
   },
   resultLabel: {
-    fontSize: 16,
-    color: '#aaa',
+    fontSize: 13,
+    color: '#888',
   },
   resultValue: {
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: '600',
     color: '#fff',
   },
+  resultValueGold: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#D4AF37',
+  },
   divider: {
     height: 1,
-    backgroundColor: '#3a3a4a',
+    backgroundColor: '#1a1a1a',
     marginVertical: 12,
   },
   guaranteedContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#1a1a2e',
-    borderRadius: 12,
-    padding: 16,
-    marginTop: 8,
+    backgroundColor: '#000',
+    borderRadius: 3,
+    padding: 14,
+    marginTop: 4,
+    borderWidth: 1,
+    borderColor: '#222',
   },
   guaranteedLabel: {
-    fontSize: 16,
+    fontSize: 11,
     fontWeight: '600',
-    color: '#fff',
+    color: '#888',
+    letterSpacing: 1,
   },
   guaranteedValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 20,
+    fontWeight: '700',
   },
   profit: {
     color: '#4CAF50',
   },
   loss: {
-    color: '#f44336',
+    color: '#E53935',
+  },
+  warning: {
+    color: '#D4AF37',
   },
   summaryContainer: {
-    backgroundColor: '#1a1a2e',
-    borderRadius: 12,
-    padding: 16,
-    marginTop: 8,
+    backgroundColor: '#000',
+    borderRadius: 3,
+    padding: 14,
+    marginTop: 4,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#222',
   },
   summaryText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#fff',
-    textAlign: 'center',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 2,
   },
   scenarioTitle: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#888',
-    marginBottom: 12,
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#D4AF37',
+    marginBottom: 10,
     marginTop: 4,
+    letterSpacing: 1,
   },
   errorCard: {
-    backgroundColor: '#3a2a2a',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
+    backgroundColor: '#0a0a0a',
+    borderRadius: 3,
+    padding: 14,
+    marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#f44336',
+    borderColor: '#E53935',
   },
   errorText: {
-    color: '#f44336',
+    color: '#E53935',
     textAlign: 'center',
+    fontSize: 12,
+    letterSpacing: 1,
   },
   infoCard: {
-    backgroundColor: '#252540',
-    borderRadius: 16,
-    padding: 20,
+    backgroundColor: '#0a0a0a',
+    borderRadius: 4,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#1a1a1a',
   },
   infoTitle: {
-    fontSize: 16,
+    fontSize: 10,
     fontWeight: '600',
-    color: '#fff',
-    marginBottom: 12,
+    color: '#555',
+    marginBottom: 10,
+    letterSpacing: 2,
   },
   infoText: {
-    fontSize: 14,
-    color: '#888',
-    lineHeight: 22,
+    fontSize: 12,
+    color: '#444',
+    lineHeight: 18,
   },
 });
