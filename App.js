@@ -211,6 +211,7 @@ export default function App() {
   const [manualResult, setManualResult] = useState(null);
   
   // Betting fee state - manual input
+  const [showFeeCard, setShowFeeCard] = useState(false);
   const [userState, setUserState] = useState(null);
   const [bettingFee, setBettingFee] = useState(0);
   const [includeFee, setIncludeFee] = useState(false);
@@ -349,15 +350,34 @@ export default function App() {
           </TouchableOpacity>
         </View>
 
-        {/* Betting Fee Card */}
-        <View style={styles.feeCard}>
-          <View style={styles.feeHeader}>
-            <Text style={styles.feeIcon}>💰</Text>
-            <Text style={styles.feeTitle}>BETTING FEE</Text>
-          </View>
-          
-          {/* Fee Input Mode Toggle - 3 options */}
-          <View style={styles.feeInputModeToggle}>
+        {/* Add Betting Fee Button */}
+        {!showFeeCard ? (
+          <TouchableOpacity
+            style={styles.addFeeButton}
+            onPress={() => setShowFeeCard(true)}
+          >
+            <Text style={styles.addFeeButtonText}>Add Betting Fee</Text>
+          </TouchableOpacity>
+        ) : (
+          /* Betting Fee Card */
+          <View style={styles.feeCard}>
+            <View style={styles.feeHeader}>
+              <Text style={styles.feeTitle}>BETTING FEE</Text>
+              <TouchableOpacity
+                style={styles.closeFeeButton}
+                onPress={() => {
+                  setShowFeeCard(false);
+                  setIncludeFee(false);
+                  setBettingFee(0);
+                  setCustomFee('');
+                }}
+              >
+                <Text style={styles.closeFeeButtonText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            
+            {/* Fee Input Mode Toggle - 3 options */}
+            <View style={styles.feeInputModeToggle}>
             <TouchableOpacity
               style={[styles.feeInputModeButton, feeInputMode === 'location' && styles.feeInputModeButtonActive]}
               onPress={() => setFeeInputMode('location')}
@@ -493,6 +513,7 @@ export default function App() {
             )}
           </View>
         </View>
+        )}
 
         {/* State Picker Modal */}
         <Modal
@@ -1058,6 +1079,29 @@ const styles = StyleSheet.create({
     color: '#444',
     lineHeight: 18,
   },
+  // Add Betting Fee Button Styles
+  addFeeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#0a0a0a',
+    borderRadius: 4,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#333',
+    borderStyle: 'dashed',
+  },
+  addFeeButtonIcon: {
+    fontSize: 16,
+    marginRight: 8,
+  },
+  addFeeButtonText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#888',
+    letterSpacing: 0.5,
+  },
   // Betting Fee Card Styles
   feeCard: {
     backgroundColor: '#0a0a0a',
@@ -1075,6 +1119,15 @@ const styles = StyleSheet.create({
   feeIcon: {
     fontSize: 16,
     marginRight: 8,
+  },
+  closeFeeButton: {
+    marginLeft: 'auto',
+    padding: 4,
+  },
+  closeFeeButtonText: {
+    fontSize: 16,
+    color: '#666',
+    fontWeight: '600',
   },
   feeTitle: {
     fontSize: 11,
