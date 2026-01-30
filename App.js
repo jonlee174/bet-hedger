@@ -12,9 +12,47 @@ import {
   Modal,
   FlatList,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as Location from 'expo-location';
+
+// Sportsbook definitions
+const SPORTSBOOKS = {
+  draftkings: { key: 'draftkings', name: 'DraftKings', color: '#53D337' },
+  fanduel: { key: 'fanduel', name: 'FanDuel', color: '#1493FF' },
+  fanatics: { key: 'fanatics', name: 'Fanatics', color: '#FF6B00' },
+  betmgm: { key: 'betmgm', name: 'BetMGM', color: '#C4A962' },
+  bet365: { key: 'bet365', name: 'bet365', color: '#027B5B' },
+  thescorebet: { key: 'thescorebet', name: 'theScore Bet', color: '#ED1C24' },
+  hardrockbet: { key: 'hardrockbet', name: 'Hard Rock Bet', color: '#FFD700' },
+};
+
+// League definitions with API sport keys
+const LEAGUES = {
+  // Basketball
+  nba: { key: 'basketball_nba', name: 'NBA', icon: '🏀' },
+  ncaab: { key: 'basketball_ncaab', name: 'NCAAB', icon: '🏀' },
+  // Football
+  nfl: { key: 'americanfootball_nfl', name: 'NFL', icon: '🏈' },
+  ncaaf: { key: 'americanfootball_ncaaf', name: 'NCAAF', icon: '🏈' },
+  // Hockey
+  nhl: { key: 'icehockey_nhl', name: 'NHL', icon: '🏒' },
+  // Baseball
+  mlb: { key: 'baseball_mlb', name: 'MLB', icon: '⚾' },
+  // Soccer
+  mls: { key: 'soccer_usa_mls', name: 'MLS', icon: '⚽' },
+  epl: { key: 'soccer_epl', name: 'EPL', icon: '⚽' },
+  // Tennis
+  tennis: { key: 'tennis_atp_us_open', name: 'Tennis (ATP)', icon: '🎾' },
+  // UFC/MMA
+  ufc: { key: 'mma_mixed_martial_arts', name: 'UFC/MMA', icon: '🥊' },
+};
+
+// The Odds API configuration (free tier: 500 requests/month)
+// Users should get their own API key from https://the-odds-api.com/
+const ODDS_API_KEY = process.env.EXPO_PUBLIC_ODDS_API_KEY || '';
+const ODDS_API_BASE = 'https://api.the-odds-api.com/v4/sports';
 
 // List of US states for picker
 const US_STATES = [
@@ -200,8 +238,121 @@ const calculateManualProfit = (originalStake, originalOdds, hedgeStake, hedgeOdd
   }
 };
 
+// Convert decimal odds to American odds
+const decimalToAmerican = (decimal) => {
+  if (decimal >= 2.0) {
+    return '+' + Math.round((decimal - 1) * 100);
+  } else {
+    return Math.round(-100 / (decimal - 1)).toString();
+  }
+};
+
+// Fetch odds from The Odds API
+const fetchOddsFromAPI = async (sportKey, selectedBooks) => {
+  if (!ODDS_API_KEY) {
+    throw new Error('API key required. Set EXPO_PUBLIC_ODDS_API_KEY environment variable.');
+  }
+  
+  const bookmakerKeys = selectedBooks.join(',');
+  const url = `${ODDS_API_BASE}/${sportKey}/odds/?apiKey=${ODDS_API_KEY}&regions=us&markets=h2h&bookmakers=${bookmakerKeys}`;
+  
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error('Failed to fetch odds');
+  }
+  return await response.json();
+};
+
+// Find hedge opportunities across selected sportsbooks
+const findHedgeOpportunities = (games, selectedBooks, stakeAmount = 100) => {
+  const opportunities = [];
+  
+  for (const game of games) {
+    // Filter bookmakers to only selected ones
+    const relevantBookmakers = game.bookmakers.filter(b => 
+      selectedBooks.includes(b.key)
+    );
+    
+    if (relevantBookmakers.length < 2) continue;
+    
+    // Get all h2h markets
+    const oddsMap = {};
+    for (const bookmaker of relevantBookmakers) {
+      const h2hMarket = bookmaker.markets.find(m => m.key === 'h2h');
+      if (!h2hMarket) continue;
+      
+      for (const outcome of h2hMarket.outcomes) {
+        if (!oddsMap[outcome.name]) {
+          oddsMap[outcome.name] = [];
+        }
+        oddsMap[outcome.name].push({
+          bookmaker: bookmaker.key,
+          bookmakerTitle: bookmaker.title,
+          price: outcome.price,
+          american: decimalToAmerican(outcome.price)
+        });
+      }
+    }
+    
+    const teams = Object.keys(oddsMap);
+    if (teams.length !== 2) continue;
+    
+    const [team1, team2] = teams;
+    
+    // Find best odds for each team
+    const bestTeam1 = oddsMap[team1].reduce((best, curr) => 
+      curr.price > best.price ? curr : best
+    );
+    const bestTeam2 = oddsMap[team2].reduce((best, curr) => 
+      curr.price > best.price ? curr : best
+    );
+    
+    // Calculate arbitrage/hedge opportunity
+    const impliedProb1 = 1 / bestTeam1.price;
+    const impliedProb2 = 1 / bestTeam2.price;
+    const totalImplied = impliedProb1 + impliedProb2;
+    
+    // Calculate stakes for guaranteed profit
+    const stake1 = stakeAmount;
+    const stake2 = (stake1 * bestTeam1.price) / bestTeam2.price;
+    const totalStake = stake1 + stake2;
+    
+    const profit1 = (stake1 * bestTeam1.price) - totalStake;
+    const profit2 = (stake2 * bestTeam2.price) - totalStake;
+    const guaranteedProfit = Math.min(profit1, profit2);
+    const profitPercent = (guaranteedProfit / totalStake) * 100;
+    
+    opportunities.push({
+      id: game.id,
+      homeTeam: game.home_team,
+      awayTeam: game.away_team,
+      commenceTime: game.commence_time,
+      team1: {
+        name: team1,
+        ...bestTeam1,
+        stake: stake1.toFixed(2),
+      },
+      team2: {
+        name: team2,
+        ...bestTeam2,
+        stake: stake2.toFixed(2),
+      },
+      totalStake: totalStake.toFixed(2),
+      profitIfTeam1Wins: profit1.toFixed(2),
+      profitIfTeam2Wins: profit2.toFixed(2),
+      guaranteedProfit: guaranteedProfit.toFixed(2),
+      profitPercent: profitPercent.toFixed(2),
+      isArbitrage: totalImplied < 1,
+      allOdds: oddsMap,
+    });
+  }
+  
+  // Sort by profit percentage (best opportunities first)
+  return opportunities.sort((a, b) => parseFloat(b.profitPercent) - parseFloat(a.profitPercent));
+};
+
 export default function App() {
-  const [mode, setMode] = useState('calculator'); // 'calculator' or 'manual'
+  const [mode, setMode] = useState('calculator'); // 'calculator', 'manual', or 'findHedge'
   const [originalStake, setOriginalStake] = useState('');
   const [originalOdds, setOriginalOdds] = useState('');
   const [hedgeOdds, setHedgeOdds] = useState('');
@@ -209,6 +360,16 @@ export default function App() {
   const [isFreeBet, setIsFreeBet] = useState(false);
   const [result, setResult] = useState(null);
   const [manualResult, setManualResult] = useState(null);
+  
+  // Find Hedge state
+  const [selectedSportsbooks, setSelectedSportsbooks] = useState(['draftkings', 'fanduel', 'fanatics']);
+  const [selectedLeague, setSelectedLeague] = useState('nba');
+  const [hedgeOpportunities, setHedgeOpportunities] = useState([]);
+  const [findHedgeLoading, setFindHedgeLoading] = useState(false);
+  const [findHedgeError, setFindHedgeError] = useState(null);
+  const [findHedgeStake, setFindHedgeStake] = useState('100');
+  const [lastRefreshTime, setLastRefreshTime] = useState(null);
+  const [expandedOpportunity, setExpandedOpportunity] = useState(null);
   
   // Betting fee state - manual input
   const [showFeeCard, setShowFeeCard] = useState(false);
@@ -316,6 +477,62 @@ export default function App() {
     setIncludeFee(false);
   }, []);
 
+  // Toggle sportsbook selection
+  const toggleSportsbook = useCallback((bookKey) => {
+    setSelectedSportsbooks(prev => {
+      if (prev.includes(bookKey)) {
+        // Don't allow deselecting if only one is selected
+        if (prev.length <= 1) return prev;
+        return prev.filter(k => k !== bookKey);
+      } else {
+        return [...prev, bookKey];
+      }
+    });
+  }, []);
+
+  // Fetch hedge opportunities
+  const fetchHedgeOpportunities = useCallback(async () => {
+    if (selectedSportsbooks.length < 2) {
+      setFindHedgeError('Select at least 2 sportsbooks');
+      return;
+    }
+    
+    setFindHedgeLoading(true);
+    setFindHedgeError(null);
+    
+    try {
+      const sportKey = LEAGUES[selectedLeague].key;
+      const games = await fetchOddsFromAPI(sportKey, selectedSportsbooks);
+      
+      const stake = parseFloat(findHedgeStake) || 100;
+      const opportunities = findHedgeOpportunities(games, selectedSportsbooks, stake);
+      
+      setHedgeOpportunities(opportunities);
+      setLastRefreshTime(new Date());
+      
+      if (opportunities.length === 0) {
+        setFindHedgeError('No games found for the selected league');
+      }
+    } catch (error) {
+      console.error('Fetch error:', error);
+      setFindHedgeError('Failed to fetch odds. Please try again.');
+    } finally {
+      setFindHedgeLoading(false);
+    }
+  }, [selectedSportsbooks, selectedLeague, findHedgeStake]);
+
+  // Format time for display
+  const formatCommenceTime = (isoString) => {
+    const date = new Date(isoString);
+    return date.toLocaleString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  };
+
   return (
     <KeyboardAvoidingView 
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -346,6 +563,14 @@ export default function App() {
           >
             <Text style={[styles.modeButtonText, mode === 'manual' && styles.modeButtonTextActive]}>
               MANUAL
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.modeButton, mode === 'findHedge' && styles.modeButtonActiveFindHedge]}
+            onPress={() => { setMode('findHedge'); setResult(null); setManualResult(null); }}
+          >
+            <Text style={[styles.modeButtonText, mode === 'findHedge' && styles.modeButtonTextActive]}>
+              FIND HEDGE
             </Text>
           </TouchableOpacity>
         </View>
@@ -561,24 +786,286 @@ export default function App() {
           </View>
         </Modal>
 
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>ORIGINAL BET</Text>
-          
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>STAKE ($)</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="100"
-              placeholderTextColor="#555"
-              keyboardType="decimal-pad"
-              value={originalStake}
-              onChangeText={setOriginalStake}
-            />
-          </View>
+        {/* Find Hedge Mode UI */}
+        {mode === 'findHedge' ? (
+          <>
+            {/* Sportsbook Selection */}
+            <View style={styles.card}>
+              <Text style={styles.sectionTitle}>SELECT SPORTSBOOKS</Text>
+              <Text style={styles.sectionHint}>Choose 2+ books to compare odds</Text>
+              
+              <View style={styles.sportsbookGrid}>
+                {Object.values(SPORTSBOOKS).map((book) => (
+                  <TouchableOpacity
+                    key={book.key}
+                    style={[
+                      styles.sportsbookButton,
+                      selectedSportsbooks.includes(book.key) && styles.sportsbookButtonActive,
+                      { borderColor: selectedSportsbooks.includes(book.key) ? book.color : '#333' }
+                    ]}
+                    onPress={() => toggleSportsbook(book.key)}
+                  >
+                    <View style={[
+                      styles.sportsbookCheck,
+                      selectedSportsbooks.includes(book.key) && { backgroundColor: book.color }
+                    ]}>
+                      {selectedSportsbooks.includes(book.key) && (
+                        <Text style={styles.sportsbookCheckMark}>✓</Text>
+                      )}
+                    </View>
+                    <Text style={[
+                      styles.sportsbookName,
+                      selectedSportsbooks.includes(book.key) && { color: book.color }
+                    ]}>
+                      {book.name}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>ODDS (AMERICAN)</Text>
-            <TextInput
+            {/* League Selection */}
+            <View style={styles.card}>
+              <Text style={styles.sectionTitle}>SELECT LEAGUE</Text>
+              
+              <View style={styles.leagueGrid}>
+                {Object.entries(LEAGUES).map(([key, league]) => (
+                  <TouchableOpacity
+                    key={key}
+                    style={[
+                      styles.leagueButton,
+                      selectedLeague === key && styles.leagueButtonActive
+                    ]}
+                    onPress={() => setSelectedLeague(key)}
+                  >
+                    <Text style={styles.leagueIcon}>{league.icon}</Text>
+                    <Text style={[
+                      styles.leagueText,
+                      selectedLeague === key && styles.leagueTextActive
+                    ]}>
+                      {league.name}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* Stake Input */}
+            <View style={styles.card}>
+              <Text style={styles.sectionTitle}>BET AMOUNT</Text>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>STAKE FOR ORIGINAL BET ($)</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="100"
+                  placeholderTextColor="#555"
+                  keyboardType="decimal-pad"
+                  value={findHedgeStake}
+                  onChangeText={setFindHedgeStake}
+                />
+              </View>
+            </View>
+
+            {/* Find Hedges Button */}
+            <TouchableOpacity
+              style={[styles.findHedgeButton, findHedgeLoading && styles.findHedgeButtonDisabled]}
+              onPress={fetchHedgeOpportunities}
+              disabled={findHedgeLoading}
+            >
+              {findHedgeLoading ? (
+                <ActivityIndicator size="small" color="#000" />
+              ) : (
+                <Text style={styles.findHedgeButtonText}>
+                  {hedgeOpportunities.length > 0 ? 'REFRESH ODDS' : 'FIND HEDGE OPPORTUNITIES'}
+                </Text>
+              )}
+            </TouchableOpacity>
+
+            {lastRefreshTime && (
+              <Text style={styles.lastRefreshText}>
+                Last updated: {lastRefreshTime.toLocaleTimeString()}
+              </Text>
+            )}
+
+            {findHedgeError && (
+              <View style={styles.errorCard}>
+                <Text style={styles.errorText}>{findHedgeError}</Text>
+              </View>
+            )}
+
+            {/* Live Betting Warning */}
+            {hedgeOpportunities.length > 0 && (
+              <View style={styles.warningNotice}>
+                <Text style={styles.warningNoticeText}>
+                  ⚠️ NOT FOR LIVE BETS: Odds do not update continuously. Always verify current odds on the sportsbook before placing any bets. Tap "Refresh Odds" to get the latest.
+                </Text>
+              </View>
+            )}
+
+            {/* Hedge Opportunities List */}
+            {hedgeOpportunities.map((opp) => (
+              <TouchableOpacity
+                key={opp.id}
+                style={[
+                  styles.opportunityCard,
+                  parseFloat(opp.guaranteedProfit) > 0 && styles.opportunityCardProfit
+                ]}
+                onPress={() => setExpandedOpportunity(expandedOpportunity === opp.id ? null : opp.id)}
+                activeOpacity={0.8}
+              >
+                {/* Game Header */}
+                <View style={styles.oppHeader}>
+                  <View style={styles.oppTeams}>
+                    <Text style={styles.oppTeamName}>{opp.homeTeam}</Text>
+                    <Text style={styles.oppVs}>vs</Text>
+                    <Text style={styles.oppTeamName}>{opp.awayTeam}</Text>
+                  </View>
+                  <Text style={styles.oppTime}>{formatCommenceTime(opp.commenceTime)}</Text>
+                </View>
+
+                {/* Best Odds Summary */}
+                <View style={styles.oppOddsRow}>
+                  <View style={styles.oppOddsItem}>
+                    <Text style={styles.oppOddsLabel}>{opp.team1.name.split(' ').pop()}</Text>
+                    <Text style={styles.oppOddsValue}>{opp.team1.american}</Text>
+                    <Text style={[styles.oppBookLabel, { color: SPORTSBOOKS[opp.team1.bookmaker]?.color || '#888' }]}>
+                      {opp.team1.bookmakerTitle}
+                    </Text>
+                  </View>
+                  <View style={styles.oppOddsDivider} />
+                  <View style={styles.oppOddsItem}>
+                    <Text style={styles.oppOddsLabel}>{opp.team2.name.split(' ').pop()}</Text>
+                    <Text style={styles.oppOddsValue}>{opp.team2.american}</Text>
+                    <Text style={[styles.oppBookLabel, { color: SPORTSBOOKS[opp.team2.bookmaker]?.color || '#888' }]}>
+                      {opp.team2.bookmakerTitle}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Profit Summary */}
+                <View style={styles.oppProfitRow}>
+                  <View style={styles.oppStakes}>
+                    <Text style={styles.oppStakeText}>
+                      Bet ${opp.team1.stake} + ${opp.team2.stake} = ${opp.totalStake}
+                    </Text>
+                  </View>
+                  <View style={[
+                    styles.oppProfitBadge,
+                    parseFloat(opp.guaranteedProfit) > 0 ? styles.oppProfitBadgePositive : styles.oppProfitBadgeNegative
+                  ]}>
+                    <Text style={[
+                      styles.oppProfitText,
+                      parseFloat(opp.guaranteedProfit) > 0 ? styles.profit : styles.loss
+                    ]}>
+                      {parseFloat(opp.guaranteedProfit) >= 0 ? '+' : ''}${opp.guaranteedProfit}
+                    </Text>
+                    <Text style={styles.oppProfitPercent}>
+                      ({opp.profitPercent}%)
+                    </Text>
+                  </View>
+                </View>
+
+                {opp.isArbitrage && (
+                  <View style={styles.arbBadge}>
+                    <Text style={styles.arbBadgeText}>⚡ ARBITRAGE</Text>
+                  </View>
+                )}
+
+                {/* Expanded Details */}
+                {expandedOpportunity === opp.id && (
+                  <View style={styles.oppExpanded}>
+                    <View style={styles.divider} />
+                    
+                    <Text style={styles.oppExpandedTitle}>ALL ODDS</Text>
+                    {Object.entries(opp.allOdds).map(([teamName, odds]) => (
+                      <View key={teamName} style={styles.oppAllOddsTeam}>
+                        <Text style={styles.oppAllOddsTeamName}>{teamName}</Text>
+                        <View style={styles.oppAllOddsList}>
+                          {odds.map((odd) => (
+                            <View key={odd.bookmaker} style={styles.oppAllOddsItem}>
+                              <Text style={[styles.oppAllOddsBook, { color: SPORTSBOOKS[odd.bookmaker]?.color || '#888' }]}>
+                                {odd.bookmakerTitle}
+                              </Text>
+                              <Text style={styles.oppAllOddsValue}>{odd.american}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      </View>
+                    ))}
+
+                    <View style={styles.divider} />
+                    
+                    <Text style={styles.oppExpandedTitle}>HEDGE STRATEGY</Text>
+                    <View style={styles.oppStrategy}>
+                      <View style={styles.oppStrategyRow}>
+                        <Text style={styles.oppStrategyLabel}>Bet on {opp.team1.name.split(' ').pop()}</Text>
+                        <Text style={styles.oppStrategyValue}>${opp.team1.stake} @ {opp.team1.bookmakerTitle}</Text>
+                      </View>
+                      <View style={styles.oppStrategyRow}>
+                        <Text style={styles.oppStrategyLabel}>Bet on {opp.team2.name.split(' ').pop()}</Text>
+                        <Text style={styles.oppStrategyValue}>${opp.team2.stake} @ {opp.team2.bookmakerTitle}</Text>
+                      </View>
+                      <View style={styles.divider} />
+                      <View style={styles.oppStrategyRow}>
+                        <Text style={styles.oppStrategyLabel}>If {opp.team1.name.split(' ').pop()} wins</Text>
+                        <Text style={[
+                          styles.oppStrategyValue,
+                          parseFloat(opp.profitIfTeam1Wins) >= 0 ? styles.profit : styles.loss
+                        ]}>
+                          {parseFloat(opp.profitIfTeam1Wins) >= 0 ? '+' : ''}${opp.profitIfTeam1Wins}
+                        </Text>
+                      </View>
+                      <View style={styles.oppStrategyRow}>
+                        <Text style={styles.oppStrategyLabel}>If {opp.team2.name.split(' ').pop()} wins</Text>
+                        <Text style={[
+                          styles.oppStrategyValue,
+                          parseFloat(opp.profitIfTeam2Wins) >= 0 ? styles.profit : styles.loss
+                        ]}>
+                          {parseFloat(opp.profitIfTeam2Wins) >= 0 ? '+' : ''}${opp.profitIfTeam2Wins}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                )}
+
+                <Text style={styles.oppTapHint}>
+                  {expandedOpportunity === opp.id ? 'Tap to collapse' : 'Tap for details'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+
+            {/* No opportunities message */}
+            {!findHedgeLoading && hedgeOpportunities.length === 0 && !findHedgeError && (
+              <View style={styles.infoCard}>
+                <Text style={styles.infoTitle}>HOW IT WORKS</Text>
+                <Text style={styles.infoText}>
+                  Select your sportsbooks and league, then tap "Find Hedge Opportunities" to scan for the best odds across books. 
+                  We'll show you where to place bets to minimize risk or find arbitrage opportunities.
+                </Text>
+              </View>
+            )}
+          </>
+        ) : (
+          <>
+            {/* Original Calculator/Manual Mode UI */}
+            <View style={styles.card}>
+              <Text style={styles.sectionTitle}>ORIGINAL BET</Text>
+              
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>STAKE ($)</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="100"
+                  placeholderTextColor="#555"
+                  keyboardType="decimal-pad"
+                  value={originalStake}
+                  onChangeText={setOriginalStake}
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>ODDS (AMERICAN)</Text>
+                <TextInput
               style={styles.input}
               placeholder="+150 or -110"
               placeholderTextColor="#555"
@@ -800,6 +1287,8 @@ export default function App() {
               : 'Enter both bets to see profit/loss for each outcome. Toggle Free Bet if original stake is bonus money.'}
           </Text>
         </View>
+          </>
+        )}
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -851,11 +1340,14 @@ const styles = StyleSheet.create({
   modeButtonActive: {
     backgroundColor: '#4CAF50',
   },
+  modeButtonActiveFindHedge: {
+    backgroundColor: '#D4AF37',
+  },
   modeButtonText: {
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: '600',
     color: '#555',
-    letterSpacing: 1,
+    letterSpacing: 0.5,
   },
   modeButtonTextActive: {
     color: '#000',
@@ -1381,5 +1873,313 @@ const styles = StyleSheet.create({
     color: '#D4AF37',
     fontWeight: '600',
     letterSpacing: 1,
+  },
+  // Find Hedge Styles
+  sectionHint: {
+    fontSize: 11,
+    color: '#666',
+    marginBottom: 12,
+    marginTop: -8,
+  },
+  sportsbookGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  sportsbookButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#000',
+    borderRadius: 4,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    minWidth: '47%',
+    flexGrow: 1,
+  },
+  sportsbookButtonActive: {
+    backgroundColor: '#0a0a0a',
+  },
+  sportsbookCheck: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#444',
+    marginRight: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sportsbookCheckMark: {
+    color: '#000',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  sportsbookName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#888',
+  },
+  leagueToggle: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  leagueGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  leagueButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#000',
+    borderRadius: 4,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: '#333',
+    gap: 6,
+    minWidth: '30%',
+    flexGrow: 1,
+  },
+  leagueButtonActive: {
+    backgroundColor: '#D4AF37',
+    borderColor: '#D4AF37',
+  },
+  leagueIcon: {
+    fontSize: 16,
+  },
+  leagueText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#888',
+  },
+  leagueTextActive: {
+    color: '#000',
+  },
+  findHedgeButton: {
+    backgroundColor: '#D4AF37',
+    borderRadius: 4,
+    padding: 16,
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  findHedgeButtonDisabled: {
+    opacity: 0.7,
+  },
+  findHedgeButtonText: {
+    color: '#000',
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
+  lastRefreshText: {
+    fontSize: 11,
+    color: '#555',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  warningNotice: {
+    backgroundColor: '#1a1a0a',
+    borderRadius: 4,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#D4AF37',
+  },
+  warningNoticeText: {
+    fontSize: 11,
+    color: '#D4AF37',
+    textAlign: 'center',
+    lineHeight: 16,
+  },
+  opportunityCard: {
+    backgroundColor: '#0a0a0a',
+    borderRadius: 4,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#222',
+  },
+  opportunityCardProfit: {
+    borderColor: '#2E7D32',
+  },
+  oppHeader: {
+    marginBottom: 12,
+  },
+  oppTeams: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    marginBottom: 4,
+  },
+  oppTeamName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  oppVs: {
+    fontSize: 12,
+    color: '#555',
+    marginHorizontal: 8,
+  },
+  oppTime: {
+    fontSize: 11,
+    color: '#666',
+  },
+  oppOddsRow: {
+    flexDirection: 'row',
+    backgroundColor: '#000',
+    borderRadius: 4,
+    padding: 12,
+    marginBottom: 12,
+  },
+  oppOddsItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  oppOddsDivider: {
+    width: 1,
+    backgroundColor: '#222',
+    marginHorizontal: 8,
+  },
+  oppOddsLabel: {
+    fontSize: 11,
+    color: '#888',
+    marginBottom: 4,
+  },
+  oppOddsValue: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#fff',
+    marginBottom: 2,
+  },
+  oppBookLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  oppProfitRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  oppStakes: {
+    flex: 1,
+  },
+  oppStakeText: {
+    fontSize: 12,
+    color: '#666',
+  },
+  oppProfitBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#000',
+    borderRadius: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    gap: 4,
+  },
+  oppProfitBadgePositive: {
+    backgroundColor: '#0a1a0a',
+    borderWidth: 1,
+    borderColor: '#2E7D32',
+  },
+  oppProfitBadgeNegative: {
+    backgroundColor: '#1a0a0a',
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  oppProfitText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  oppProfitPercent: {
+    fontSize: 11,
+    color: '#888',
+  },
+  arbBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: '#D4AF37',
+    borderRadius: 3,
+    paddingVertical: 3,
+    paddingHorizontal: 6,
+  },
+  arbBadgeText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#000',
+    letterSpacing: 0.5,
+  },
+  oppExpanded: {
+    marginTop: 12,
+  },
+  oppExpandedTitle: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#666',
+    letterSpacing: 1,
+    marginBottom: 10,
+    marginTop: 8,
+  },
+  oppAllOddsTeam: {
+    marginBottom: 12,
+  },
+  oppAllOddsTeamName: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#fff',
+    marginBottom: 6,
+  },
+  oppAllOddsList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  oppAllOddsItem: {
+    backgroundColor: '#000',
+    borderRadius: 3,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: '#222',
+  },
+  oppAllOddsBook: {
+    fontSize: 9,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  oppAllOddsValue: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  oppStrategy: {
+    backgroundColor: '#000',
+    borderRadius: 4,
+    padding: 12,
+  },
+  oppStrategyRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 6,
+  },
+  oppStrategyLabel: {
+    fontSize: 12,
+    color: '#888',
+  },
+  oppStrategyValue: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  oppTapHint: {
+    fontSize: 10,
+    color: '#444',
+    textAlign: 'center',
+    marginTop: 12,
   },
 });
